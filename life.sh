@@ -48,52 +48,29 @@ fi
 }
 
 function print_field {
-    local -a myfield=()
-    if [[ "${#@}" = 0 ]]; then
-	myfield=( "${field[@]}" )
-    else
-	myfield=( "$@" )
-    fi
-
     for y in $(seq 0 $(( ${rows} - 1 ))); do
 	for x in $(seq 0 $(( ${columns} - 1 ))); do
-	    field_get $x $y "${myfield[@]}"
+	    field_get $x $y
 	    echo -n " "
 	done
 	echo
     done
 }
 
-function field_get {
+function coord_to_idx {
     local -i x="${1}" ; shift
     local -i y="${1}" ; shift
+    echo $(( ${y} * ${columns} + ${x} ))
+}
 
-    local -a myfield=()
-    if [[ "${#@}" = 0 ]]; then
-	myfield=( "${field[@]}" )
-    else
-	myfield=( "$@" )
-    fi
-
-    if (( $x < 0 )); then
-	echo "NARFa $x $y" 1>&2
-	traceback 1 1>&2
-    fi
-
-    echo -n "${myfield[$(( ${y} * ${rows} + ${x} ))]}"
+function field_get {
+    echo -n "${field[$(coord_to_idx "$@")]}"
 }
 
 function field_set {
     local -i x="${1}" ; shift
     local -i y="${1}" ; shift
     local value="${1}" ; shift
-
-    local -a myfield=()
-    if [[ "${#@}" = 0 ]]; then
-	myfield=( "${field[@]}" )
-    else
-	myfield=( "$@" )
-    fi
 
     # Assertion
     case "${value}" in
@@ -102,18 +79,13 @@ function field_set {
 	*) echo "WRONG"; exit 1;;
     esac
 
-    local -i idx=$(( ${y} * ${rows} + ${x} ))
-    myfield[$idx]="${value}"
-
-    echo "${myfield[@]}"
+    field[$(coord_to_idx $x $y)]="${value}"
 }
 
 function neighbor_count {
     local -i x="${1}"
     local -i y="${2}"
     local -i count=0
-    #local -i i=$(( ${y} * ${rows} + ${x} ))
-    #echo field[$()$i] 1>&2
 
     for i in "-1" 0 "+1"; do
 	for j in "-1" 0 "+1"; do
@@ -135,6 +107,26 @@ declare -i rows=6
 declare -i columns=8
 declare -a field=()
 declare -a new_field=()
+declare design=gliber
+declare -i iterations=6
+
+while (( $# > 0 )); do
+    case "${1}" in
+	-i|--iterations)
+	    iterations="${2}"; shift;;
+	-*)
+	    echo "Unknown flag ${i}"; exit 1;;
+	*[0-9]x[0-9]*)
+	    rows="${1/x*/}"
+	    columns="${1/*x/}"
+	    ;;
+	*)
+	    design="${1}"
+	    ;;
+    esac
+    shift
+done
+
 
 declare -a seq=( 0 $(seq $(( ${rows} * ${columns} - 1 ))) )
 
@@ -142,18 +134,26 @@ for i in "${seq[@]}"; do
     push_a field '.'
 done
 
-case "${1}" in
+case "${design}" in
     blinker)
-	field=( $(field_set 0 1 o) )
-	field=( $(field_set 1 1 o) )
-	field=( $(field_set 2 1 o) )
+        #   0 1 2
+        # 0 . . .
+        # 1 o o o
+        # 2 . . .
+	field_set 0 1 o
+	field_set 1 1 o
+	field_set 2 1 o
 	;;
     glider)
-	field=( $(field_set 0 1 o) )
-	field=( $(field_set 1 2 o) )
-	field=( $(field_set 2 0 o) )
-	field=( $(field_set 2 1 o) )
-	field=( $(field_set 2 2 o) )
+        #   0 1 2
+	# 0 . . o
+        # 1 o . o
+        # 2 . o o
+	field_set 2 0 o
+	field_set 0 1 o
+	field_set 2 1 o
+	field_set 1 2 o
+	field_set 2 2 o
 	;;
     spaceship)
 	#   0 1 2 3 4
@@ -161,28 +161,23 @@ case "${1}" in
 	# 1 . . . . o
 	# 2 o . . . o
 	# 3 . o o o o
-	field=( $(field_set 0 0 o) )
-	field=( $(field_set 3 0 o) )
+	field_set 0 0 o
+	field_set 3 0 o
 
-	field=( $(field_set 4 1 o) )
+	field_set 4 1 o
 
-	field=( $(field_set 0 2 o) )
-	print_field; exit
-	field=( $(field_set 4 2 o) )
+	field_set 0 2 o
+	field_set 4 2 o
 
-	field=( $(field_set 1 3 o) )
-	field=( $(field_set 2 3 o) )
-	field=( $(field_set 3 3 o) )
-	field=( $(field_set 4 3 o) )
+	field_set 1 3 o
+	field_set 2 3 o
+	field_set 3 3 o
+	field_set 4 3 o
 	;;
     *)
 	echo "specify a shape"
 	exit 13
 esac
-shift
-
-
-declare -i iterations="${1:-100}"
 
 echo
 echo "Initial:"
@@ -199,9 +194,8 @@ while (( $iterations > 0 )); do
     # Populate new_field with the next iteration.
     for y in $(seq 0 $(( ${rows} - 1 ))); do
 	for x in $(seq 0 $(( ${columns} - 1 ))); do
-	    declare -i i=$(( ${y} * ${rows} + ${x} ))
 	    declare -i count=$(neighbor_count ${x} ${y})
-	    declare old="${field[${i}]}"
+	    declare old="$(field_get $x $y)"
 	    if [[ "${old}" = 'o' ]]; then
 		if (( $count < 2 || $count > 3 )); then # under-population
 		    push_a new_field .
