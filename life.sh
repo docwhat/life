@@ -2,50 +2,45 @@
 
 set -eu
 
+#declare -i start_time="$(date +'%s%N')"
 #function debug_trap {
+#    if [[ "${FUNCNAME[1]}" != return_trap ]]; then
 #    #(set -o posix ; set) 1>&2
-#    echo "$(date +'%s%N') ${FUNCNAME[1]} ${BASH_LINENO[0]}" 1>&2
+#	local -i time="$(date +'%s%N')"
+#	time=$(( (${time} - ${start_time}) / 1000000 ))
+#	echo "${time}ms ${FUNCNAME[1]} ${BASH_LINENO[0]}" 1>&2
+#    fi
 #}
 #set -T
 #shopt -s extdebug
 #trap debug_trap DEBUG
 #function return_trap {
 #    #(set -o posix ; set) 1>&2
-#    echo "$(date +'%s%N') ${FUNCNAME[1]} ${BASH_LINENO[1]} RETURN" 1>&2
+#    local -i time="$(date +'%s%N')"
+#    time=$(( (${time} - ${start_time}) / 1000000 ))
+#    echo "${time}ms ${FUNCNAME[1]} ${BASH_LINENO[0]} RETURN" 1>&2
 #}
 #trap return_trap RETURN
 
-function traceback {
-    local -i start=1
-    if [[ -n "${1:-}" ]]; then
-        # Always hide our function call...
-        start=$(( $1 + ${start} ))
-    fi
-    local i
-    local j
-    echo "Traceback (last called is first):"
-    for i in $(seq "${start}" $(( ${#BASH_SOURCE[@]} - 1 ))); do
-        j=$(( $i - 1 ))
-        local function="${FUNCNAME[$i]}"
-        local file="${BASH_SOURCE[$i]}"
-        local line="${BASH_LINENO[$j]}"
-        echo "     ${function}() in ${file}:${line}"
-    done
-}
-
-function push_a {
-    local name="${1}"
-    local value="${2}"
-    local c="\"\${#${name}[@]}\""
-    local v="\"\${${name}[@]}\""
-    eval "
-if (( ${c} == 0 )); then
-  ${name}=( \"\${value}\" )
-else
-  ${name}=( ${v} \"\${value}\" )
-fi
-"
-}
+## Yes, this is an honest to goddess traceback for bash.
+## Useful for debugging.
+#function traceback {
+#    local -i start=1
+#    if [[ -n "${1:-}" ]]; then
+#        # Always hide our function call...
+#        start=$(( $1 + ${start} ))
+#    fi
+#    local i
+#    local j
+#    echo "Traceback (last called is first):"
+#    for i in $(seq "${start}" $(( ${#BASH_SOURCE[@]} - 1 ))); do
+#        j=$(( $i - 1 ))
+#        local function="${FUNCNAME[$i]}"
+#        local file="${BASH_SOURCE[$i]}"
+#        local line="${BASH_LINENO[$j]}"
+#        echo "     ${function}() in ${file}:${line}"
+#    done
+#}
 
 function print_field {
     for y in $(seq 0 $(( ${rows} - 1 ))); do
@@ -248,17 +243,18 @@ while (( $iterations > 0 )); do
 	for x in $(seq 0 $(( ${columns} - 1 ))); do
 	    declare -i count=$(neighbor_count ${x} ${y})
 	    declare old="$(field_get $x $y)"
+	    declare -i idx=$(coord_to_idx $x $y)
 	    if [[ "${old}" = 'o' ]]; then
 		if (( $count < 2 || $count > 3 )); then # under-population
-		    new_field[$(coord_to_idx $x $y)]=.
+		    new_field[$idx]=.
 		else
-		    new_field[$(coord_to_idx $x $y)]=o
+		    new_field[$idx]=o
 		fi
 	    else
 		if (( $count == 3 )); then
-		    new_field[$(coord_to_idx $x $y)]=o
+		    new_field[$idx]=o
 		else
-		    new_field[$(coord_to_idx $x $y)]=.
+		    new_field[$idx]=.
 		fi
 	    fi
 	done
@@ -273,7 +269,7 @@ while (( $iterations > 0 )); do
     field=( "${new_field[@]}" )
     new_field=( "${seq}" )
 
-    echo "Iterations $iterations:"
+    echo "Iteration $iterations:"
     print_field
     iterations=$(( $iterations - 1 ))
 done
