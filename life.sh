@@ -109,8 +109,22 @@ while (( $# > 0 )); do
     case "${1}" in
 	-i|--iterations)
 	    iterations="${2}"; shift;;
+	-h|--help)
+	    cat <<EOF
+Usage: $0 [OPTIONS] [pattern] [<columns>x<rows>]
+
+Options:
+  -h --help             This help.
+  -i --interations NUM  Run for NUM iterations at most.
+
+You can specify the size of the playing field by using <columns>x<rows> (e.g. '5x5').
+
+Patterns:
+EOF
+	    grep -E '^ +[^ (*]+\)' life.sh | grep -E -o '.*[^)]'
+	    exit;;
 	-*)
-	    echo "Unknown flag ${i}"; exit 1;;
+	    echo "Unknown flag ${1}"; exit 1;;
 	*[0-9]x[0-9]*)
 	    rows="${1/x*/}"
 	    columns="${1/*x/}"
@@ -132,7 +146,8 @@ for i in "${seq[@]}"; do
 done
 
 case "${design}" in
-    blank) ;;
+    blank)
+	;;
     random)
 	for i in "${seq[@]}"; do
 	    if (( $RANDOM % 3 == 0 )); then
