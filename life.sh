@@ -68,9 +68,9 @@ function field_get {
 }
 
 function field_set {
-    local -i x="${1}" ; shift
-    local -i y="${1}" ; shift
-    local value="${1}" ; shift
+    local -i x="${1}"
+    local -i y="${2}"
+    local value="${3:-o}"
 
     # Assertion
     case "${value}" in
@@ -129,31 +129,69 @@ done
 
 
 declare -a seq=( 0 $(seq $(( ${rows} * ${columns} - 1 ))) )
+field=( "${seq[@]}" )
+new_field=( "${seq[@]}" )
 
 for i in "${seq[@]}"; do
-    push_a field '.'
+    field[$i]=.
 done
 
 case "${design}" in
+    blank) ;;
+    random)
+	for i in "${seq[@]}"; do
+	    if (( $RANDOM % 3 == 0 )); then
+		field[$i]=o
+	    else
+		field[$i]=.
+	    fi
+	done
+	;;
     blinker)
         #   0 1 2
         # 0 . . .
         # 1 o o o
         # 2 . . .
-	field_set 0 1 o
-	field_set 1 1 o
-	field_set 2 1 o
+	field_set 0 1
+	field_set 1 1
+	field_set 2 1
+	;;
+    block)
+        #   0 1 2
+        # 0 o o .
+        # 1 o o .
+        # 2 . . .
+	field_set 0 0
+	field_set 1 0
+	field_set 0 1
+	field_set 1 1
+	;;
+    beacon)
+	#   0 1 2 3
+	# 0 o o . .
+	# 1 o o . .
+	# 2 . . o o
+	# 3 . . o o
+	field_set 0 0
+	field_set 1 0
+	field_set 0 1
+	field_set 1 1
+
+	field_set 2 2
+	field_set 3 2
+	field_set 2 3
+	field_set 3 3
 	;;
     glider)
         #   0 1 2
 	# 0 . . o
         # 1 o . o
         # 2 . o o
-	field_set 2 0 o
-	field_set 0 1 o
-	field_set 2 1 o
-	field_set 1 2 o
-	field_set 2 2 o
+	field_set 2 0
+	field_set 0 1
+	field_set 2 1
+	field_set 1 2
+	field_set 2 2
 	;;
     spaceship)
 	#   0 1 2 3 4
@@ -161,18 +199,33 @@ case "${design}" in
 	# 1 . . . . o
 	# 2 o . . . o
 	# 3 . o o o o
-	field_set 0 0 o
-	field_set 3 0 o
+	field_set 0 0
+	field_set 3 0
 
-	field_set 4 1 o
+	field_set 4 1
 
-	field_set 0 2 o
-	field_set 4 2 o
+	field_set 0 2
+	field_set 4 2
 
-	field_set 1 3 o
-	field_set 2 3 o
-	field_set 3 3 o
-	field_set 4 3 o
+	field_set 1 3
+	field_set 2 3
+	field_set 3 3
+	field_set 4 3
+	;;
+    diehard)
+	#   0 1 2 3 4 5 6 7
+	# 0 . . . . . . o .
+	# 1 o o . . . . . .
+	# 2 . o . . . o o o
+	field_set 6 0
+
+	field_set 0 1
+	field_set 1 1
+
+	field_set 1 2
+	field_set 5 2
+	field_set 6 2
+	field_set 7 2
 	;;
     *)
 	echo "specify a shape"
@@ -185,7 +238,6 @@ print_field
 
 while (( $iterations > 0 )); do
     echo
-    echo "Iterations $iterations:"
 
     declare -i x=-1
     declare -i y=-1
@@ -198,25 +250,30 @@ while (( $iterations > 0 )); do
 	    declare old="$(field_get $x $y)"
 	    if [[ "${old}" = 'o' ]]; then
 		if (( $count < 2 || $count > 3 )); then # under-population
-		    push_a new_field .
+		    new_field[$(coord_to_idx $x $y)]=.
 		else
-		    push_a new_field o
+		    new_field[$(coord_to_idx $x $y)]=o
 		fi
 	    else
 		if (( $count == 3 )); then
-		    push_a new_field o
+		    new_field[$(coord_to_idx $x $y)]=o
 		else
-		    push_a new_field .
+		    new_field[$(coord_to_idx $x $y)]=.
 		fi
 	    fi
 	done
     done
 
     # Tock
+    if [[ "${field[*]}" = "${new_field[*]}" ]]; then
+	echo "Stopped since nothing changed."
+	exit 0
+    fi
     # Copy new_field to field, and empty new_field.
     field=( "${new_field[@]}" )
-    new_field=()
+    new_field=( "${seq}" )
 
+    echo "Iterations $iterations:"
     print_field
     iterations=$(( $iterations - 1 ))
 done
