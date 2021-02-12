@@ -4,13 +4,7 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    open-pull-requests-limit: 10
     labels:
       - ":game_die: dependencies"
       - ":robot: bot"
-    allowed_updates:
-      - match:
-          update_type: "all"
-    automerged_updates:
-      - match:
-          dependency_type: "all"
-          update_type: "semver:minor"
